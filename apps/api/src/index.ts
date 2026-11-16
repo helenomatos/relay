@@ -17,6 +17,16 @@ const quiet = { logLevel: "warn" } as const;
 
 await app.register(cors, { origin: true });
 
+// Never leak internals (SQL errors, stack traces) to clients.
+app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
+  const status = err.statusCode ?? 500;
+  if (status >= 500) {
+    req.log.error(err);
+    return reply.code(status).send({ error: "internal_error" });
+  }
+  return reply.code(status).send({ error: err.name === "FastifyError" ? "bad_request" : err.name, message: err.message });
+});
+
 app.addHook("onResponse", async (req, reply) => {
   const route = req.routeOptions.url ?? "unknown";
   if (route === "/metrics" || route === "/v1/stream") return;

@@ -1,4 +1,4 @@
-import { backoffMs, sign } from "@relay/core";
+import { assertPublicUrl, backoffMs, sign, UnsafeUrlError } from "@relay/core";
 import type { Redis } from "ioredis";
 import type { Sql } from "postgres";
 import type { CircuitBreaker } from "./circuit";
@@ -79,9 +79,14 @@ export function createDeliverer(sql: Sql, redis: Redis, circuit: CircuitBreaker)
     let statusCode: number | null = null;
     let error: string | null = null;
     const started = performance.now();
+    let unsafe = false;
     try {
+      // Re-checked at delivery time: a hostname that was public when the endpoint
+      // was registered could resolve to an internal address now.
+      if (!config.allowPrivateEndpoints) await assertPublicUrl(target.url);
       const res = await fetch(target.url, {
         method: "POST",
+        redirect: "manual", // never follow redirects to somewhere we didn't vet
         headers: {
           "content-type": "application/json",
           "user-agent": "Relay-Webhooks/1.0",
@@ -96,13 +101,15 @@ export function createDeliverer(sql: Sql, redis: Redis, circuit: CircuitBreaker)
       await res.body?.cancel();
     } catch (err) {
       const e = err as Error & { cause?: { code?: string } };
-      error = e.name === "TimeoutError" ? "timeout" : (e.cause?.code ?? e.message);
+      unsafe = err instanceof UnsafeUrlError;
+      error = unsafe ? `unsafe_destination: ${e.message}` : e.name === "TimeoutError" ? "timeout" : (e.cause?.code ?? e.message);
     }
     const latencyMs = Math.round(performance.now() - started);
     attemptDuration.observe(latencyMs / 1000);
 
     const ok = statusCode !== null && statusCode >= 200 && statusCode < 300;
-    const outcome: Outcome = ok ? "succeeded" : attempt >= config.maxAttempts ? "dead" : "retrying";
+    // An unsafe destination won't become safe by retrying: dead-letter it straight away.
+    const outcome: Outcome = ok ? "succeeded" : unsafe || attempt >= config.maxAttempts ? "dead" : "retrying";
     const nextAttemptAt = new Date(
       Date.now() + backoffMs(attempt, { baseMs: config.backoffBaseMs, capMs: config.backoffCapMs }),
     );

@@ -51,6 +51,15 @@ flowchart LR
 - **Signed payloads**, following the [Standard Webhooks](https://www.standardwebhooks.com) spec: HMAC-SHA256 over `id.timestamp.body`, a timestamp tolerance against replay attacks, constant-time comparison, and support for several signatures during key rotation.
 - **Multi-tenant.** Requests are authenticated with API keys, stored only as SHA-256 hashes. Every query is scoped by tenant.
 
+## Security
+
+- **SSRF protection.** Tenants choose the URLs Relay calls, so endpoint URLs are checked against private, loopback, link-local and cloud-metadata ranges (IPv4 and IPv6). The check runs at registration and again before every delivery, so a hostname that later resolves to an internal address is caught. Redirects are not followed. The local demo relaxes this with `ALLOW_PRIVATE_ENDPOINTS=true`, because its consumer lives on the Docker network.
+- **API keys are stored only as SHA-256 hashes.** Endpoint signing secrets are returned once, at creation.
+- **No internal errors are leaked.** 5xx responses are generic, and inputs (`limit`, ids, bodies) are validated before they reach SQL. All queries are parameterised.
+- **Bounded inputs**: request bodies are size-limited, and event types and endpoint lists are capped.
+- **Local stack is not exposed.** Every port in `docker-compose.yml` binds to `127.0.0.1`. The credentials in `.env.example` and the compose file are throwaway demo values, never meant for real use.
+- **The SSE stream authenticates with `?key=`**, since `EventSource` can't send headers. That route is excluded from the nginx access log.
+
 ## Run it
 
 Requires Docker.
@@ -137,4 +146,6 @@ TypeScript · Node.js · Fastify · PostgreSQL · Redis · BullMQ · React · Ta
 
 - The reference receiver keeps its dedup set in memory. A real consumer would use a unique constraint or a TTL'd key store.
 - Delivery ordering is not guaranteed (by design, as in most webhook providers). Per-endpoint FIFO would need partitioned queues.
+- The SSRF re-check resolves DNS just before the request, but the HTTP client resolves again on connect. Closing that last small window needs pinning the resolved IP in a custom dispatcher.
+- There is no per-tenant rate limiting yet.
 - Next: per-tenant rate limits, endpoint secret rotation via the API, OpenTelemetry traces, and Terraform for AWS (ECS Fargate + RDS + ElastiCache).

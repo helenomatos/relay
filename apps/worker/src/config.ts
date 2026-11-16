@@ -10,6 +10,8 @@ export const config = {
   databaseUrl: required("DATABASE_URL"),
   redisUrl: required("REDIS_URL"),
   metricsPort: num("METRICS_PORT", 9100),
+  /** Only for local demos: allow delivering to private/internal addresses (SSRF guard off). */
+  allowPrivateEndpoints: process.env.ALLOW_PRIVATE_ENDPOINTS === "true",
 
   /** Parallel HTTP deliveries per worker process. */
   concurrency: num("WORKER_CONCURRENCY", 50),

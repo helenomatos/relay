@@ -1,5 +1,9 @@
 name: relay
 
+# Local demo stack. Credentials below are throwaway demo values, and every port is
+# bound to 127.0.0.1 so nothing (including the anonymous Grafana admin) is reachable
+# from your network.
+
 x-node-env: &node-env
   DATABASE_URL: postgres://relay:relay@postgres:5432/relay
   REDIS_URL: redis://redis:6379
@@ -15,7 +19,7 @@ services:
       POSTGRES_USER: relay
       POSTGRES_PASSWORD: relay
       POSTGRES_DB: relay
-    ports: ["55432:5432"]
+    ports: ["127.0.0.1:55432:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U relay"]
@@ -25,7 +29,7 @@ services:
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
-    ports: ["56379:6379"]
+    ports: ["127.0.0.1:56379:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -49,7 +53,10 @@ services:
       DEMO_API_KEY: ${DEMO_API_KEY:-rk_demo_7f3c9a1e5b2d4f6a8c0e}
       RECEIVER_SECRET: ${RECEIVER_SECRET:-whsec_ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
       DEMO_ENDPOINTS: "http://receiver:4000/hooks/billing=invoice.paid,invoice.failed;http://receiver:4000/hooks/crm=*"
-    ports: ["3000:3000"]
+      # The demo consumer lives on the internal Docker network, so the SSRF guard is relaxed here.
+      # Leave this unset anywhere real.
+      ALLOW_PRIVATE_ENDPOINTS: "true"
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -67,6 +74,7 @@ services:
       MAX_ATTEMPTS: "10"
       BACKOFF_BASE_MS: "500"
       BACKOFF_CAP_MS: "30000"
+      ALLOW_PRIVATE_ENDPOINTS: "true"
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -81,7 +89,7 @@ services:
     environment:
       PORT: "4000"
       RECEIVER_SECRET: ${RECEIVER_SECRET:-whsec_ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
-    ports: ["4000:4000"]
+    ports: ["127.0.0.1:4000:4000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -95,14 +103,14 @@ services:
       target: dashboard
       args:
         VITE_DEMO_API_KEY: ${DEMO_API_KEY:-rk_demo_7f3c9a1e5b2d4f6a8c0e}
-    ports: ["8088:80"]
+    ports: ["127.0.0.1:8088:80"]
     depends_on:
       api: { condition: service_healthy }
 
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
 
   grafana:
     image: grafana/grafana:11.3.0
@@ -112,7 +120,7 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/relay.json
     volumes: ["./infra/grafana/provisioning:/etc/grafana/provisioning:ro"]
-    ports: ["3001:3000"]
+    ports: ["127.0.0.1:3001:3000"]
     depends_on: [prometheus]
 
   k6:

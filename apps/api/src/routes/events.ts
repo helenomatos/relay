@@ -2,10 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sql } from "../db";
 import { eventsIngested } from "../metrics";
+import { parseLimit } from "../validation";
 
 const EventBody = z.object({
   type: z.string().min(1).max(100).regex(/^[a-z0-9_.-]+$/i),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 export async function eventRoutes(app: FastifyInstance) {
@@ -50,7 +51,7 @@ export async function eventRoutes(app: FastifyInstance) {
   });
 
   app.get("/events", async (req) => {
-    const limit = Math.min(Number((req.query as { limit?: string }).limit ?? 50), 200);
+    const limit = parseLimit((req.query as { limit?: string }).limit);
     return sql`
       select id, type, payload, idempotency_key, created_at from events
       where tenant_id = ${req.tenantId} order by created_at desc limit ${limit}`;

@@ -33,9 +33,16 @@ const json = (res: http.ServerResponse, status: number, body: unknown) => {
   res.end(JSON.stringify(body));
 };
 
+const MAX_BODY = 1024 * 1024;
+
 const readBody = async (req: http.IncomingMessage) => {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY) throw Object.assign(new Error("payload_too_large"), { status: 413 });
+    chunks.push(chunk as Buffer);
+  }
   return Buffer.concat(chunks).toString("utf8");
 };
 
@@ -99,7 +106,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/health") return json(res, 200, { ok: true });
     return json(res, 404, { error: "not_found" });
   } catch (err) {
-    return json(res, 500, { error: (err as Error).message });
+    const status = (err as { status?: number }).status ?? 500;
+    return json(res, status, { error: status === 500 ? "internal_error" : (err as Error).message });
   }
 });
 

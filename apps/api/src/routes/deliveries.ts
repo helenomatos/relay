@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { sql } from "../db";
+import { isUuid, parseLimit } from "../validation";
 
 const STATUSES = new Set(["pending", "queued", "delivering", "succeeded", "dead"]);
 
@@ -7,7 +8,7 @@ export async function deliveryRoutes(app: FastifyInstance) {
   app.get("/deliveries", async (req, reply) => {
     const q = req.query as { status?: string; limit?: string };
     if (q.status && !STATUSES.has(q.status)) return reply.code(400).send({ error: "invalid_status" });
-    const limit = Math.min(Number(q.limit ?? 50), 200);
+    const limit = parseLimit(q.limit);
     return sql`
       select d.id, d.status, d.attempts, d.last_status_code, d.last_error, d.last_latency_ms,
              d.next_attempt_at, d.created_at, d.updated_at, d.delivered_at,
@@ -20,8 +21,9 @@ export async function deliveryRoutes(app: FastifyInstance) {
       limit ${limit}`;
   });
 
-  app.get("/deliveries/:id/attempts", async (req) => {
+  app.get("/deliveries/:id/attempts", async (req, reply) => {
     const { id } = req.params as { id: string };
+    if (!isUuid(id)) return reply.code(404).send({ error: "not_found" });
     return sql`
       select attempt, ok, status_code, error, latency_ms, created_at from delivery_attempts
       where delivery_id = ${id} and tenant_id = ${req.tenantId} order by attempt`;
@@ -30,6 +32,7 @@ export async function deliveryRoutes(app: FastifyInstance) {
   // Dead-letter replay: back into the outbox with a fresh retry budget.
   app.post("/deliveries/:id/replay", async (req, reply) => {
     const { id } = req.params as { id: string };
+    if (!isUuid(id)) return reply.code(404).send({ error: "not_found_or_not_dead" });
     const rows = await sql`
       update deliveries set status = 'pending', attempts = 0, next_attempt_at = now(), updated_at = now()
       where id = ${id} and tenant_id = ${req.tenantId} and status = 'dead' returning id`;
