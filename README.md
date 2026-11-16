@@ -1,10 +1,12 @@
 # Relay
 
+[![CI](https://github.com/helenomatos/relay/actions/workflows/ci.yml/badge.svg)](https://github.com/helenomatos/relay/actions/workflows/ci.yml)
+
 **Reliable webhook delivery: at-least-once, signed, observable, and tested under chaos.**
 
 Relay takes events from your application and delivers them to your customers' HTTP endpoints. It keeps delivering when those endpoints fail, slow down, or go offline, and when Relay's own workers crash.
 
-![Relay dashboard after a chaos run: 15,000 deliveries, 15,000 confirmed, 0 lost](docs/dashboard-settled.jpg)
+![Relay dashboard during a chaos run: 30% failures, a consumer outage, and 0 lost](docs/demo.gif)
 
 ## The result
 
