@@ -1,0 +1,62 @@
+{
+  "uid": "relay",
+  "title": "Relay — delivery pipeline",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Events ingested / s",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(rate(relay_events_ingested_total[30s]))", "legendFormat": "ingested" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Delivery attempts / s by outcome",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (outcome) (rate(relay_delivery_attempts_total[30s]))", "legendFormat": "{{outcome}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Endpoint latency (p50 / p95 / p99)",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum by (le) (rate(relay_delivery_duration_seconds_bucket[1m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(relay_delivery_duration_seconds_bucket[1m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(relay_delivery_duration_seconds_bucket[1m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Backlog: outbox pending vs queue",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "relay_outbox_pending", "legendFormat": "outbox pending" },
+        { "expr": "sum by (state) (relay_queue_depth)", "legendFormat": "queue {{state}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "API latency p95 by route",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, route) (rate(relay_http_request_duration_seconds_bucket[1m])))", "legendFormat": "{{route}}" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Circuit breaker openings",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(relay_circuit_opened_total)" }]
+    }
+  ]
+}
