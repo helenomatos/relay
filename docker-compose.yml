@@ -51,7 +51,7 @@ services:
       <<: *node-env
       PORT: "3000"
       DEMO_API_KEY: ${DEMO_API_KEY:-rk_demo_7f3c9a1e5b2d4f6a8c0e}
-      RECEIVER_SECRET: ${RECEIVER_SECRET:-whsec_ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
+      RECEIVER_SECRET: ${RECEIVER_SECRET:-ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
       DEMO_ENDPOINTS: "http://receiver:4000/hooks/billing=invoice.paid,invoice.failed;http://receiver:4000/hooks/crm=*"
       # The demo consumer lives on the internal Docker network, so the SSRF guard is relaxed here.
       # Leave this unset anywhere real.
@@ -88,7 +88,7 @@ services:
     command: ["node", "apps/receiver/dist/index.js"]
     environment:
       PORT: "4000"
-      RECEIVER_SECRET: ${RECEIVER_SECRET:-whsec_ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
+      RECEIVER_SECRET: ${RECEIVER_SECRET:-ZGVtby1zZWNyZXQtZm9yLWxvY2FsLXVzZS1vbmx5}
     ports: ["127.0.0.1:4000:4000"]
     depends_on:
       migrate: { condition: service_completed_successfully }
